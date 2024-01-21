@@ -204,7 +204,168 @@ class MinimalConfig(n: Int = 1) extends Config(
               t.L2NBanks * t.L2CacheParamsOpt.map(_.toCacheParams.capacity).getOrElse(0)
             }.sum
             val l2params = core.L2CacheParamsOpt.get.toCacheParams
-            l2params.copy(sets = 2 * clientDirBytes / core.L2NBanks / l2params.ways / 64)
+            l2params.copy(sets = 2 * clientDirBytes / core.L2NBanks / l2params.ways / 64) //this [2] means that L2NBanks = 2???
+          },
+          simulation = !site(DebugOptionsKey).FPGAPlatform,
+          prefetch = None
+        )),
+        L3NBanks = 1
+      )
+  })
+)
+
+class MyMinimalConfig(n: Int = 1) extends Config(
+  new BaseConfig(n).alter((site, here, up) => {
+    case XSTileKey => up(XSTileKey).map(
+      _.copy(
+        DecodeWidth = 2,
+        RenameWidth = 2,
+        CommitWidth = 2,
+        FetchWidth = 4,
+        IssQueSize = 8,
+        NRPhyRegs = 64,
+        VirtualLoadQueueSize = 16,
+        LoadQueueRARSize = 16, 
+        LoadQueueRAWSize = 12, 
+        LoadQueueReplaySize = 8,
+        LoadUncacheBufferSize = 8,
+        LoadQueueNWriteBanks = 4, // NOTE: make sure that LoadQueue{RAR, RAW, Replay}Size is divided by LoadQueueNWriteBanks.
+        RollbackGroupSize = 8,
+        StoreQueueSize = 12,
+        StoreQueueNWriteBanks = 4, // NOTE: make sure that StoreQueueSize is divided by StoreQueueNWriteBanks
+        StoreQueueForwardWithMask = true,
+        RobSize = 32,
+        FtqSize = 8,
+        IBufSize = 16,
+        StoreBufferSize = 4,
+        StoreBufferThreshold = 3,
+        dpParams = DispatchParameters(
+          IntDqSize = 12,
+          FpDqSize = 12,
+          LsDqSize = 12,
+          IntDqDeqWidth = 4,
+          FpDqDeqWidth = 4,
+          LsDqDeqWidth = 4
+        ),
+        exuParameters = ExuParameters(
+          JmpCnt = 1,
+          AluCnt = 2,
+          MulCnt = 0,
+          MduCnt = 1,
+          FmacCnt = 1,
+          FmiscCnt = 1,
+          FmiscDivSqrtCnt = 0,
+          LduCnt = 2,
+          StuCnt = 2
+        ),
+        icacheParameters = ICacheParameters(
+          nSets = 64, // 16KB ICache
+          tagECC = Some("parity"),
+          dataECC = Some("parity"),
+          replacer = Some("setplru"),
+          nMissEntries = 2,
+          nReleaseEntries = 1,
+          nProbeEntries = 2,
+          nPrefetchEntries = 2,
+          nPrefBufferEntries = 32,
+          hasPrefetch = true
+        ),
+        dcacheParametersOpt = Some(DCacheParameters(
+          nSets = 64, // 32KB DCache
+          nWays = 8,
+          tagECC = Some("secded"),
+          dataECC = Some("secded"),
+          replacer = Some("setplru"),
+          nMissEntries = 4,
+          nProbeEntries = 4,
+          nReleaseEntries = 8,
+          nMaxPrefetchEntry = 2,
+        )),
+        EnableBPD = false, // disable TAGE
+        EnableLoop = false,
+        itlbParameters = TLBParameters(
+          name = "itlb",
+          fetchi = true,
+          useDmode = false,
+          normalReplacer = Some("plru"),
+          superReplacer = Some("plru"),
+          normalNWays = 4,
+          normalNSets = 1,
+          superNWays = 2
+        ),
+        ldtlbParameters = TLBParameters(
+          name = "ldtlb",
+          normalNSets = 16, // when da or sa
+          normalNWays = 1, // when fa or sa
+          normalAssociative = "sa",
+          normalReplacer = Some("setplru"),
+          superNWays = 4,
+          normalAsVictim = true,
+          partialStaticPMP = true,
+          outsideRecvFlush = true,
+          outReplace = false
+        ),
+        sttlbParameters = TLBParameters(
+          name = "sttlb",
+          normalNSets = 16, // when da or sa
+          normalNWays = 1, // when fa or sa
+          normalAssociative = "sa",
+          normalReplacer = Some("setplru"),
+          normalAsVictim = true,
+          superNWays = 4,
+          partialStaticPMP = true,
+          outsideRecvFlush = true,
+          outReplace = false
+        ),
+        pftlbParameters = TLBParameters(
+          name = "pftlb",
+          normalNSets = 16, // when da or sa
+          normalNWays = 1, // when fa or sa
+          normalAssociative = "sa",
+          normalReplacer = Some("setplru"),
+          normalAsVictim = true,
+          superNWays = 4,
+          partialStaticPMP = true,
+          outsideRecvFlush = true,
+          outReplace = false
+        ),
+        btlbParameters = TLBParameters(
+          name = "btlb",
+          normalNSets = 1,
+          normalNWays = 8,
+          superNWays = 2
+        ),
+        l2tlbParameters = L2TLBParameters(
+          l1Size = 4,
+          l2nSets = 4,
+          l2nWays = 4,
+          l3nSets = 4,
+          l3nWays = 8,
+          spSize = 2,
+        ),
+        L2CacheParamsOpt = Some(L2Param(
+          name = "L2",
+          ways = 8,
+          sets = 128, // instead of 128
+          echoField = Seq(huancun.DirtyField()),
+          prefetch = None
+        )),
+        L2NBanks = 2, //instead of 2
+        prefetcher = None // if L2 pf_recv_node does not exist, disable SMS prefetcher
+      )
+    )
+    case SoCParamsKey =>
+      val tiles = site(XSTileKey)
+      up(SoCParamsKey).copy(
+        L3CacheParamsOpt = Some(up(SoCParamsKey).L3CacheParamsOpt.get.copy(
+          sets = 256,
+          inclusive = false,
+          clientCaches = tiles.map{ core =>
+            val clientDirBytes = tiles.map{ t =>
+              t.L2NBanks * t.L2CacheParamsOpt.map(_.toCacheParams.capacity).getOrElse(0)
+            }.sum
+            val l2params = core.L2CacheParamsOpt.get.toCacheParams
+            l2params.copy(sets = 2 * clientDirBytes / core.L2NBanks / l2params.ways / 64) //this [2] means that L2NBanks = 2???
           },
           simulation = !site(DebugOptionsKey).FPGAPlatform,
           prefetch = None
@@ -226,6 +387,16 @@ class MinimalSimConfig(n: Int = 1) extends Config(
     )
   })
 )
+
+// Test config with no L3 cache?
+class SuperMiniConfig(n: Int = 1) extends Config(
+  new MinimalConfig(n).alter((site, here, up) => {
+    case SoCParamsKey => up(SoCParamsKey).copy(
+      L3CacheParamsOpt = None
+    )
+  })
+)
+
 
 class WithNKBL1D(n: Int, ways: Int = 8) extends Config((site, here, up) => {
   case XSTileKey =>
@@ -282,6 +453,7 @@ class WithNKBL3(n: Int, ways: Int = 8, inclusive: Boolean = true, banks: Int = 1
     val clientDirBytes = tiles.map{ t =>
       t.L2NBanks * t.L2CacheParamsOpt.map(_.toCacheParams.capacity).getOrElse(0)
     }.sum
+    println(s"In WithNKBL3, clientDirBytes is ${clientDirBytes}")
     up(SoCParamsKey).copy(
       L3NBanks = banks,
       L3CacheParamsOpt = Some(HCCacheParameters(
