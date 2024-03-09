@@ -1,18 +1,17 @@
-/***************************************************************************************
-* Copyright (c) 2020-2021 Institute of Computing Technology, Chinese Academy of Sciences
-* Copyright (c) 2020-2021 Peng Cheng Laboratory
-*
-* XiangShan is licensed under Mulan PSL v2.
-* You can use this software according to the terms and conditions of the Mulan PSL v2.
-* You may obtain a copy of Mulan PSL v2 at:
-*          http://license.coscl.org.cn/MulanPSL2
-*
-* THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
-* EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
-* MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
-*
-* See the Mulan PSL v2 for more details.
-***************************************************************************************/
+/** *************************************************************************************
+  * Copyright (c) 2020-2021 Institute of Computing Technology, Chinese Academy
+  * of Sciences Copyright (c) 2020-2021 Peng Cheng Laboratory
+  *
+  * XiangShan is licensed under Mulan PSL v2. You can use this software
+  * according to the terms and conditions of the Mulan PSL v2. You may obtain a
+  * copy of Mulan PSL v2 at: http://license.coscl.org.cn/MulanPSL2
+  *
+  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
+  * KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+  * NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+  *
+  * See the Mulan PSL v2 for more details.
+  */
 
 import os.Path
 import mill._
@@ -46,7 +45,10 @@ trait XSModule extends ScalaModule with PublishModule {
 
   override def scalacOptions = Seq("-Xsource:2.11")
 
-  override def ivyDeps = (if(chiselOpt.isEmpty) Agg(ivys.chisel3) else Agg.empty[Dep]) ++ Agg(ivys.chiselCirct)
+  override def ivyDeps =
+    (if (chiselOpt.isEmpty) Agg(ivys.chisel3) else Agg.empty[Dep]) ++ Agg(
+      ivys.chiselCirct
+    )
 
   override def moduleDeps = Seq() ++ chiselOpt
 
@@ -73,8 +75,11 @@ object rocketchip extends `rocket-chip`.common.CommonRocketChip {
 
   override def millSourcePath = rcPath
 
-  object configRocket extends `rocket-chip`.`api-config-chipsalliance`.`build-rules`.mill.build.config with PublishModule {
-    override def millSourcePath = rcPath / "api-config-chipsalliance" / "design" / "craft"
+  object configRocket
+      extends `rocket-chip`.`api-config-chipsalliance`.`build-rules`.mill.build.config
+      with PublishModule {
+    override def millSourcePath =
+      rcPath / "api-config-chipsalliance" / "design" / "craft"
 
     override def scalaVersion = T {
       rocketchip.scalaVersion()
@@ -96,11 +101,15 @@ object rocketchip extends `rocket-chip`.common.CommonRocketChip {
       rocketchip.scalaVersion()
     }
 
-    def chisel3IvyDeps = if(chisel3Module.isEmpty) Agg(
-      common.getVersion("chisel3")
-    ) else Agg.empty[Dep]
+    def chisel3IvyDeps = if (chisel3Module.isEmpty)
+      Agg(
+        common.getVersion("chisel3")
+      )
+    else Agg.empty[Dep]
 
-    def chisel3PluginIvyDeps = Agg(common.getVersion("chisel3-plugin", cross=true))
+    def chisel3PluginIvyDeps = Agg(
+      common.getVersion("chisel3-plugin", cross = true)
+    )
   }
 
   def hardfloatModule = hardfloatRocket
@@ -159,6 +168,7 @@ trait CommonXiangShan extends XSModule with SbtModule { m =>
   override def millSourcePath = os.pwd
 
   override def forkArgs = Seq("-Xmx15G", "-Xss256m")
+  // override def forkArgs = Seq("-Xmx30G", "-Xss256m")
 
   override def ivyDeps = super.ivyDeps() ++ Seq(ivys.chiseltest)
 
