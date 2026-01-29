@@ -237,6 +237,11 @@ class Sc(implicit p: Parameters) extends BasePredictor with HasScParameters with
     s1_sumPercsum.length == NumWays,
     s"s1_sumPercsum length ${s1_sumPercsum.length} != NumWays $NumWays"
   )
+  private val s1_totalPercsumAll = VecInit(s1_biasPercsum.zipWithIndex.map {
+    case (biasPercsum, wayIdx) =>
+      val idx = wayIdx >> BiasUseTageBitWidth
+      biasPercsum +& s1_sumPercsum(idx)
+  }.grouped(BiasTableNumWays / NumWays).toSeq.map(group => VecInit(group)))
 
   /*
    *  predict pipeline stage 2
@@ -275,9 +280,9 @@ class Sc(implicit p: Parameters) extends BasePredictor with HasScParameters with
   private val s2_globalPred = s2_wayIdx.map(wayIdx => s2_globalPercsum(wayIdx) >= 0.S)     // for performance counter
   private val s2_biasPred   = s2_biasWayIdx.map(biasIdx => s2_biasPercsum(biasIdx) >= 0.S) // for performance counter
 
-  private val s2_totalPercsum = VecInit(s2_wayIdx.zip(s2_biasWayIdx).map {
-    case (wayIdx, biasIdx) =>
-      s2_sumPercsum(wayIdx) +& s2_biasPercsum(biasIdx)
+  private val s2_totalPercsumAll = RegEnable(s1_totalPercsumAll, s1_fire)
+  private val s2_totalPercsum = VecInit(s2_wayIdx.zip(s2_biasIdxLowBits).map { case (wayIdx, lowBits) =>
+    s2_totalPercsumAll(wayIdx)(lowBits)
   })
 
   require(NumWays == s2_mbtbResult.length, s"NumWays $NumWays != s2_mbtbHitMask.length ${s2_mbtbResult.length}")
